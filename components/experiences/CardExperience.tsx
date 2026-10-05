@@ -1,365 +1,500 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
-import { Canvas } from "@react-three/fiber";
-import { ContactShadows, OrbitControls, PerspectiveCamera } from "@react-three/drei";
+import { useMemo, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Sparkles, Share2, RefreshCw, Heart } from "lucide-react";
-import { Card } from "@/types/card";
+import type { Card } from "@/types/card";
 import { formatBirthdayDate } from "@/lib/utils";
-import { Balloons3D } from "./Balloons3D";
-import { MagicCake } from "./MagicCake";
-import { ConfettiCelebration } from "./ConfettiCelebration";
+import Balloons3D from "./Balloons3D";
+import MagicCake from "./MagicCake";
+import ConfettiCelebration from "./ConfettiCelebration";
 
 type Stage =
   | "opening"
   | "balloons"
-  | "cake_reveal"
   | "candles"
-  | "cake_cutting"
+  | "cutting"
   | "celebration"
   | "letter";
 
-interface CardExperienceProps {
+export default function CardExperience({
+  card,
+}: {
   card: Card;
-}
+}) {
+  const [stage, setStage] =
+    useState<Stage>("opening");
 
-export function CardExperience({ card }: CardExperienceProps) {
-  const [stage, setStage] = useState<Stage>("opening");
-  const [poppedBalloons, setPoppedBalloons] = useState<number[]>([]);
-  const [litCandles, setLitCandles] = useState<boolean[]>([true, true, true, true, true]);
-  const [isCakeCut, setIsCakeCut] = useState(false);
-  const [isCuttingAnim, setIsCuttingAnim] = useState(false);
-  const [copied, setCopied] = useState(false);
+  const [poppedBalloons, setPoppedBalloons] =
+    useState<number[]>([]);
 
-  const formattedDate = formatBirthdayDate(card.birthday_date);
-  const totalBalloons = 7;
+  const [candlesOut, setCandlesOut] =
+    useState<number[]>([]);
 
-  // Auto-advance Stage 2 (Balloons) -> Stage 3 (Cake Reveal)
-  useEffect(() => {
-    if (stage === "balloons" && poppedBalloons.length >= totalBalloons) {
-      const timer = setTimeout(() => {
-        setStage("cake_reveal");
-      }, 600);
-      return () => clearTimeout(timer);
-    }
-  }, [poppedBalloons, stage]);
+  const [cut, setCut] = useState(false);
 
-  // Auto-advance Stage 3 -> Stage 4 (Candles)
-  useEffect(() => {
-    if (stage === "cake_reveal") {
-      const timer = setTimeout(() => {
-        setStage("candles");
-      }, 2000);
-      return () => clearTimeout(timer);
-    }
-  }, [stage]);
+  const birthdayDate = useMemo(
+    () =>
+      formatBirthdayDate(
+        card.birthday_date
+      ),
+    [card.birthday_date]
+  );
 
-  // Auto-advance Stage 4 (Candles) -> Stage 5 (Cake Cutting)
-  useEffect(() => {
-    if (stage === "candles" && litCandles.every((lit) => !lit)) {
-      const timer = setTimeout(() => {
-        setStage("cake_cutting");
-      }, 800);
-      return () => clearTimeout(timer);
-    }
-  }, [litCandles, stage]);
+  const recipient =
+    card.recipient_name?.trim() ||
+    "Someone Special";
 
-  const handlePopBalloon = (id: number) => {
-    if (!poppedBalloons.includes(id)) {
-      setPoppedBalloons((prev) => [...prev, id]);
-    }
-  };
+  const sender =
+    card.sender_name?.trim() ||
+    "Someone who cares";
 
-  const handleBlowCandle = (index: number) => {
-    if (litCandles[index]) {
-      setLitCandles((prev) => {
-        const next = [...prev];
-        next[index] = false;
-        return next;
-      });
-    }
-  };
+  const message =
+    card.message?.trim() ||
+    "Wishing you a beautiful birthday filled with happiness.";
 
-  const handleCutCake = () => {
-    setIsCuttingAnim(true);
-    setTimeout(() => {
-      setIsCakeCut(true);
-      setTimeout(() => {
-        setIsCuttingAnim(false);
-        setStage("celebration");
-      }, 1000);
-    }, 600);
-  };
+  function popBalloon(id: number) {
+    setPoppedBalloons((current) => {
+      if (current.includes(id)) {
+        return current;
+      }
 
-  const handleShare = async () => {
-    const shareData = {
-      title: `Magic Card for ${card.recipient_name}`,
-      text: `${card.recipient_name}, someone sent you a magical birthday surprise! ✨`,
-      url: window.location.href,
-    };
+      const updated = [...current, id];
+
+      if (updated.length === 7) {
+        setTimeout(() => {
+          setStage("candles");
+        }, 600);
+      }
+
+      return updated;
+    });
+  }
+
+  function extinguishCandle(id: number) {
+    setCandlesOut((current) => {
+      if (current.includes(id)) {
+        return current;
+      }
+
+      const updated = [...current, id];
+
+      if (updated.length === 4) {
+        setTimeout(() => {
+          setStage("cutting");
+        }, 700);
+      }
+
+      return updated;
+    });
+  }
+
+  async function shareCard() {
+    const url = window.location.href;
 
     if (navigator.share) {
       try {
-        await navigator.share(shareData);
+        await navigator.share({
+          title: `A birthday surprise for ${recipient}`,
+          text: `A special birthday card for ${recipient}`,
+          url,
+        });
       } catch {
-        // User canceled or share failed
+        // User cancelled sharing.
       }
-    } else {
-      await navigator.clipboard.writeText(window.location.href);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2500);
+
+      return;
     }
-  };
+
+    try {
+      await navigator.clipboard.writeText(url);
+      alert("Card link copied!");
+    } catch {
+      alert(url);
+    }
+  }
 
   return (
-    <div className="relative w-full h-screen overflow-hidden bg-gradient-to-b from-slate-950 via-purple-950 to-slate-900 select-none text-white">
-      {/* Background Ambient Glow */}
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_rgba(236,72,153,0.15)_0%,_transparent_70%)] pointer-events-none" />
+    <main className="min-h-screen overflow-hidden bg-[#080914] text-white">
+      <div className="relative min-h-screen">
 
-      {/* 3D Canvas Scene */}
-      <Canvas shadows className="absolute inset-0 z-0">
-        <PerspectiveCamera makeDefault position={[0, 1.2, 5]} fov={50} />
-        <OrbitControls
-          enableZoom={false}
-          enablePan={false}
-          maxPolarAngle={Math.PI / 2 + 0.1}
-          minPolarAngle={Math.PI / 4}
-        />
+        {/* BACKGROUND GLOW */}
+        <div className="pointer-events-none absolute inset-0 overflow-hidden">
+          <div className="absolute left-1/2 top-1/3 h-[500px] w-[500px] -translate-x-1/2 rounded-full bg-pink-500/10 blur-[120px]" />
 
-        <ambientLight intensity={0.7} />
-        <directionalLight
-          position={[5, 8, 5]}
-          intensity={1.2}
-          castShadow
-          shadow-mapSize-width={1024}
-          shadow-mapSize-height={1024}
-        />
-        <pointLight position={[-4, 3, -2]} intensity={0.5} color="#A855F7" />
+          <div className="absolute right-0 top-0 h-[350px] w-[350px] rounded-full bg-purple-500/10 blur-[100px]" />
 
-        {/* Stage 2 Balloons */}
-        {stage === "balloons" && (
-          <Balloons3D
-            total={totalBalloons}
-            poppedIds={poppedBalloons}
-            onPopBalloon={handlePopBalloon}
-          />
-        )}
+          <div className="absolute bottom-0 left-0 h-[300px] w-[300px] rounded-full bg-blue-500/10 blur-[100px]" />
+        </div>
 
-        {/* Stages 3 to 7: Birthday Cake Scene */}
-        {stage !== "opening" && stage !== "balloons" && (
-          <MagicCake
-            isCut={isCakeCut}
-            litCandles={litCandles}
-            onBlowCandle={handleBlowCandle}
-            showKnife={isCuttingAnim}
-            isCuttingAnimation={isCuttingAnim}
-          />
-        )}
+        <AnimatePresence mode="wait">
 
-        {/* Confetti Celebration Particle Layer */}
-        <ConfettiCelebration active={stage === "celebration" || stage === "letter"} />
-
-        <ContactShadows
-          position={[0, -0.75, 0]}
-          opacity={0.6}
-          scale={8}
-          blur={1.5}
-          far={4}
-        />
-      </Canvas>
-
-      {/* Framer Motion Overlay UI */}
-      <div className="relative z-10 w-full h-full pointer-events-none flex flex-col justify-between p-6">
-        {/* Header / Top Progress Banners */}
-        <header className="w-full flex justify-center pt-4">
-          <AnimatePresence mode="wait">
-            {stage === "balloons" && (
-              <motion.div
-                key="banner-balloons"
-                initial={{ opacity: 0, y: -20 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -20 }}
-                className="bg-white/10 backdrop-blur-md px-6 py-2.5 rounded-full border border-white/20 shadow-lg text-center"
-              >
-                <p className="text-sm font-medium tracking-wide text-pink-200">
-                  Tap the balloons 🎈 ({poppedBalloons.length} / {totalBalloons})
-                </p>
-              </motion.div>
-            )}
-
-            {stage === "candles" && (
-              <motion.div
-                key="banner-candles"
-                initial={{ opacity: 0, y: -20 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -20 }}
-                className="bg-white/10 backdrop-blur-md px-6 py-2.5 rounded-full border border-white/20 shadow-lg text-center"
-              >
-                <p className="text-sm font-medium tracking-wide text-amber-200">
-                  Make a wish 🕯️ Tap each candle to blow it out
-                </p>
-              </motion.div>
-            )}
-
-            {stage === "celebration" && (
-              <motion.div
-                key="banner-celebration"
-                initial={{ opacity: 0, scale: 0.8 }}
-                animate={{ opacity: 1, scale: 1 }}
-                className="text-center"
-              >
-                <h1 className="text-3xl md:text-5xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-pink-400 via-purple-300 to-amber-300 drop-shadow-md">
-                  Happy Birthday, {card.recipient_name}! 🎉
-                </h1>
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </header>
-
-        {/* Stage Dynamic Center Interfaces */}
-        <main className="flex-1 flex items-center justify-center pointer-events-auto">
-          {/* Stage 1: Opening Experience */}
+          {/* OPENING */}
           {stage === "opening" && (
-            <motion.div
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              className="text-center max-w-md p-8 rounded-3xl bg-white/10 backdrop-blur-xl border border-white/20 shadow-2xl space-y-6"
+            <motion.section
+              key="opening"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="relative z-10 flex min-h-screen flex-col items-center justify-center px-6 text-center"
             >
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-pink-500/20 text-pink-300 text-xs font-semibold tracking-wider uppercase">
-                <Sparkles className="w-3.5 h-3.5" /> Something Special For You ✨
-              </div>
+              <motion.div
+                initial={{
+                  opacity: 0,
+                  y: 25,
+                }}
+                animate={{
+                  opacity: 1,
+                  y: 0,
+                }}
+                transition={{
+                  duration: 0.8,
+                }}
+              >
+                <p className="mb-4 text-sm uppercase tracking-[0.35em] text-pink-200/70">
+                  A little surprise
+                </p>
 
-              <h1 className="text-4xl md:text-5xl font-extrabold text-white tracking-tight">
-                {card.recipient_name}
-              </h1>
+                <h1 className="text-4xl font-bold tracking-tight sm:text-6xl">
+                  For{" "}
+                  <span className="bg-gradient-to-r from-pink-300 via-purple-300 to-blue-300 bg-clip-text text-transparent">
+                    {recipient}
+                  </span>
+                </h1>
 
-              <p className="text-slate-300 text-sm md:text-base leading-relaxed">
-                Someone made a little magic specifically for you today.
-              </p>
+                <p className="mx-auto mt-5 max-w-md text-white/60">
+                  Someone made something special
+                  just for you.
+                </p>
+              </motion.div>
 
               <motion.button
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
+                type="button"
+                onClick={() =>
+                  setStage("balloons")
+                }
+                className="mt-10 rounded-full border border-white/20 bg-white/10 px-8 py-4 text-sm font-semibold uppercase tracking-[0.2em] backdrop-blur-xl"
                 animate={{
+                  scale: [1, 1.04, 1],
                   boxShadow: [
-                    "0 0 15px rgba(236,72,153,0.4)",
-                    "0 0 30px rgba(236,72,153,0.8)",
-                    "0 0 15px rgba(236,72,153,0.4)",
+                    "0 0 0 rgba(255,105,180,0)",
+                    "0 0 35px rgba(255,105,180,.35)",
+                    "0 0 0 rgba(255,105,180,0)",
                   ],
                 }}
-                transition={{ duration: 2, repeat: Infinity }}
-                onClick={() => setStage("balloons")}
-                className="w-full py-4 px-8 rounded-2xl bg-gradient-to-r from-pink-500 via-purple-500 to-indigo-500 text-white font-bold text-lg shadow-xl cursor-pointer border border-white/30"
+                transition={{
+                  duration: 2,
+                  repeat: Infinity,
+                }}
+                whileHover={{
+                  scale: 1.07,
+                }}
+                whileTap={{
+                  scale: 0.94,
+                }}
               >
-                OPEN YOUR SURPRISE 🎁
+                ✨ Open Your Surprise
               </motion.button>
-            </motion.div>
+            </motion.section>
           )}
 
-          {/* Stage 5: Cake Cutting Interactive Button */}
-          {stage === "cake_cutting" && (
-            <motion.div
-              initial={{ opacity: 0, y: 30 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="text-center"
+          {/* BALLOONS */}
+          {stage === "balloons" && (
+            <motion.section
+              key="balloons"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="relative z-10 min-h-screen"
             >
-              <motion.button
-                whileHover={{ scale: 1.08 }}
-                whileTap={{ scale: 0.92 }}
-                animate={{ scale: [1, 1.03, 1] }}
-                transition={{ duration: 1.5, repeat: Infinity }}
-                onClick={handleCutCake}
-                disabled={isCuttingAnim}
-                className="py-4 px-10 rounded-2xl bg-gradient-to-r from-amber-500 via-pink-500 to-purple-600 text-white font-extrabold text-xl shadow-2xl cursor-pointer border border-amber-200/40 tracking-wider"
-              >
-                🔪 CUT THE CAKE
-              </motion.button>
-            </motion.div>
-          )}
-
-          {/* Stage 6 Transition to Letter */}
-          {stage === "celebration" && (
-            <motion.div
-              initial={{ opacity: 0, y: 40 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 1 }}
-              className="mt-auto mb-6"
-            >
-              <button
-                onClick={() => setStage("letter")}
-                className="py-3 px-8 rounded-full bg-white/20 hover:bg-white/30 backdrop-blur-md border border-white/30 text-white font-semibold text-sm tracking-wide transition shadow-lg cursor-pointer"
-              >
-                READ YOUR LETTER 💌
-              </button>
-            </motion.div>
-          )}
-
-          {/* Stage 7 & 8: Personalized Letter & Sharing */}
-          {stage === "letter" && (
-            <motion.div
-              initial={{ opacity: 0, y: 30, scale: 0.95 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              className="w-full max-w-lg p-8 rounded-3xl bg-slate-900/80 backdrop-blur-2xl border border-pink-500/30 shadow-2xl space-y-6 text-left my-auto"
-            >
-              <div className="flex items-center justify-between border-b border-white/10 pb-4">
-                <h2 className="text-2xl font-bold text-pink-300">
-                  Dear {card.recipient_name},
+              <div className="absolute left-0 right-0 top-8 z-20 text-center">
+                <h2 className="text-2xl font-bold">
+                  Pop the balloons 🎈
                 </h2>
-                {formattedDate && (
-                  <span className="text-xs font-medium text-slate-400 bg-white/5 px-3 py-1 rounded-full border border-white/10">
-                    {formattedDate}
-                  </span>
-                )}
-              </div>
 
-              {/* Dynamic Personalized Message Body with preserved whitespace */}
-              <div className="text-slate-200 leading-relaxed text-sm md:text-base whitespace-pre-wrap max-h-60 overflow-y-auto pr-2">
-                {card.message}
-              </div>
+                <p className="mt-2 text-sm text-white/60">
+                  Tap each balloon to reveal
+                  your surprise.
+                </p>
 
-              <div className="border-t border-white/10 pt-4 text-right">
-                <p className="text-xs text-slate-400 uppercase tracking-widest">With love,</p>
-                <p className="text-lg font-bold text-pink-400">
-                  {card.sender_name || "Someone special"}
+                <p className="mt-3 text-xs text-white/40">
+                  {poppedBalloons.length} / 7 popped
                 </p>
               </div>
 
-              {/* Action Buttons */}
-              <div className="pt-2 flex flex-col sm:flex-row gap-3">
-                <motion.button
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
-                  onClick={handleShare}
-                  className="flex-1 py-3.5 px-6 rounded-xl bg-gradient-to-r from-pink-500 to-purple-600 text-white font-bold text-sm flex items-center justify-center gap-2 shadow-lg cursor-pointer"
-                >
-                  <Share2 className="w-4 h-4" />
-                  {copied ? "LINK COPIED! ✨" : "SHARE THIS MAGIC ✨"}
-                </motion.button>
-
-                <button
-                  onClick={() => {
-                    setPoppedBalloons([]);
-                    setLitCandles([true, true, true, true, true]);
-                    setIsCakeCut(false);
-                    setStage("opening");
-                  }}
-                  className="py-3.5 px-5 rounded-xl bg-white/10 hover:bg-white/20 border border-white/20 text-slate-200 font-semibold text-sm flex items-center justify-center gap-2 transition cursor-pointer"
-                >
-                  <RefreshCw className="w-4 h-4" /> REPLAY
-                </button>
+              <div className="h-screen w-full">
+                <Balloons3D
+                  poppedIds={poppedBalloons}
+                  onPop={popBalloon}
+                />
               </div>
-            </motion.div>
+            </motion.section>
           )}
-        </main>
 
-        {/* Footer */}
-        <footer className="w-full text-center pb-2">
-          <p className="text-xs text-slate-500 flex items-center justify-center gap-1">
-            Made with <Heart className="w-3 h-3 text-pink-500 fill-pink-500" /> on MagicCards
-          </p>
-        </footer>
+          {/* CANDLES */}
+          {stage === "candles" && (
+            <motion.section
+              key="candles"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="relative z-10 min-h-screen"
+            >
+              <div className="absolute left-0 right-0 top-8 z-20 text-center">
+                <h2 className="text-2xl font-bold">
+                  Make a wish ✨
+                </h2>
+
+                <p className="mt-2 text-sm text-white/60">
+                  Tap the candles to blow them out.
+                </p>
+              </div>
+
+              <div className="h-screen w-full">
+                <MagicCake
+                  candlesOut={candlesOut}
+                  onCandleClick={
+                    extinguishCandle
+                  }
+                  cut={false}
+                />
+              </div>
+            </motion.section>
+          )}
+
+          {/* CUTTING */}
+          {stage === "cutting" && (
+            <motion.section
+              key="cutting"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="relative z-10 min-h-screen"
+            >
+              <div className="absolute left-0 right-0 top-8 z-20 text-center">
+                <h2 className="text-2xl font-bold">
+                  The cake is ready 🎂
+                </h2>
+
+                <p className="mt-2 text-sm text-white/60">
+                  Cut the cake and reveal the
+                  celebration.
+                </p>
+              </div>
+
+              <div className="h-screen w-full">
+                <MagicCake
+                  candlesOut={candlesOut}
+                  onCandleClick={
+                    extinguishCandle
+                  }
+                  cut={cut}
+                />
+              </div>
+
+              {!cut && (
+                <div className="absolute bottom-10 left-0 right-0 z-20 flex justify-center">
+                  <motion.button
+                    type="button"
+                    onClick={() => {
+                      setCut(true);
+
+                      setTimeout(() => {
+                        setStage(
+                          "celebration"
+                        );
+                      }, 1300);
+                    }}
+                    className="rounded-full border border-white/20 bg-white/10 px-8 py-4 font-semibold backdrop-blur-xl"
+                    whileHover={{
+                      scale: 1.06,
+                    }}
+                    whileTap={{
+                      scale: 0.94,
+                    }}
+                    animate={{
+                      boxShadow: [
+                        "0 0 0 rgba(255,255,255,0)",
+                        "0 0 30px rgba(255,255,255,.25)",
+                        "0 0 0 rgba(255,255,255,0)",
+                      ],
+                    }}
+                    transition={{
+                      duration: 1.8,
+                      repeat: Infinity,
+                    }}
+                  >
+                    🔪 Cut the Cake
+                  </motion.button>
+                </div>
+              )}
+            </motion.section>
+          )}
+
+          {/* CELEBRATION */}
+          {stage === "celebration" && (
+            <motion.section
+              key="celebration"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="relative z-10 flex min-h-screen flex-col items-center justify-center px-6 text-center"
+            >
+              <div className="absolute inset-0">
+                <Canvas
+                  camera={{
+                    position: [0, 0, 8],
+                    fov: 50,
+                  }}
+                  dpr={[1, 1.5]}
+                >
+                  <ambientLight intensity={1.5} />
+                  <ConfettiCelebration />
+                </Canvas>
+              </div>
+
+              <motion.div
+                className="relative z-10"
+                initial={{
+                  opacity: 0,
+                  scale: 0.7,
+                }}
+                animate={{
+                  opacity: 1,
+                  scale: 1,
+                }}
+                transition={{
+                  type: "spring",
+                  stiffness: 150,
+                }}
+              >
+                <div className="text-7xl">
+                  🎉
+                </div>
+
+                <h1 className="mt-5 text-4xl font-black sm:text-6xl">
+                  Happy Birthday,
+                </h1>
+
+                <h2 className="mt-2 bg-gradient-to-r from-pink-300 via-purple-300 to-blue-300 bg-clip-text text-4xl font-black text-transparent sm:text-6xl">
+                  {recipient}! 🎂
+                </h2>
+
+                <p className="mx-auto mt-6 max-w-lg text-white/70">
+                  Today is all about celebrating
+                  you and the happiness you bring
+                  into the world.
+                </p>
+
+                <motion.button
+                  type="button"
+                  onClick={() =>
+                    setStage("letter")
+                  }
+                  className="mt-10 rounded-full bg-white px-8 py-4 font-bold text-black"
+                  whileHover={{
+                    scale: 1.06,
+                  }}
+                  whileTap={{
+                    scale: 0.94,
+                  }}
+                >
+                  💌 Open Your Letter
+                </motion.button>
+              </motion.div>
+            </motion.section>
+          )}
+
+          {/* LETTER */}
+          {stage === "letter" && (
+            <motion.section
+              key="letter"
+              initial={{
+                opacity: 0,
+                y: 25,
+              }}
+              animate={{
+                opacity: 1,
+                y: 0,
+              }}
+              className="relative z-10 flex min-h-screen items-center justify-center px-5 py-12"
+            >
+              <div className="w-full max-w-xl rounded-[30px] border border-white/15 bg-white/[0.08] p-7 shadow-2xl backdrop-blur-2xl sm:p-10">
+                <div className="text-center">
+                  <div className="text-5xl">
+                    💌
+                  </div>
+
+                  <p className="mt-5 text-sm uppercase tracking-[0.25em] text-pink-200/70">
+                    A message for you
+                  </p>
+
+                  <h1 className="mt-3 text-3xl font-bold">
+                    Dear {recipient}
+                  </h1>
+                </div>
+
+                <div className="my-8 h-px bg-white/10" />
+
+                <p className="whitespace-pre-wrap text-center text-lg leading-8 text-white/80">
+                  {message}
+                </p>
+
+                {birthdayDate && (
+                  <div className="mt-8 rounded-2xl bg-white/[0.06] p-4 text-center">
+                    <p className="text-xs uppercase tracking-widest text-white/40">
+                      Birthday
+                    </p>
+
+                    <p className="mt-1 font-medium text-white/80">
+                      {birthdayDate}
+                    </p>
+                  </div>
+                )}
+
+                <div className="mt-8 text-center">
+                  <p className="text-sm text-white/40">
+                    With love & good wishes,
+                  </p>
+
+                  <p className="mt-1 text-lg font-semibold">
+                    {sender}
+                  </p>
+                </div>
+
+                <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+                  <motion.button
+                    type="button"
+                    onClick={shareCard}
+                    className="flex-1 rounded-full bg-white px-6 py-3 font-semibold text-black"
+                    whileTap={{
+                      scale: 0.95,
+                    }}
+                  >
+                    🔗 Share Card
+                  </motion.button>
+
+                  <motion.button
+                    type="button"
+                    onClick={() => {
+                      setPoppedBalloons([]);
+                      setCandlesOut([]);
+                      setCut(false);
+                      setStage("opening");
+                    }}
+                    className="flex-1 rounded-full border border-white/15 bg-white/5 px-6 py-3 font-semibold"
+                    whileTap={{
+                      scale: 0.95,
+                    }}
+                  >
+                    ↻ Replay
+                  </motion.button>
+                </div>
+              </div>
+            </motion.section>
+          )}
+
+        </AnimatePresence>
       </div>
-    </div>
+    </main>
   );
 }
