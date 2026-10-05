@@ -1,883 +1,365 @@
 "use client";
 
-import { Canvas, useFrame } from "@react-three/fiber";
-import {
-  Environment,
-  Float,
-  Sparkles,
-  Text,
-  ContactShadows,
-  RoundedBox,
-} from "@react-three/drei";
-import { useEffect, useMemo, useRef, useState } from "react";
-import * as THREE from "three";
-import type { Card } from "@/types/card";
+import React, { useState, useEffect } from "react";
+import { Canvas } from "@react-three/fiber";
+import { ContactShadows, OrbitControls, PerspectiveCamera } from "@react-three/drei";
+import { motion, AnimatePresence } from "framer-motion";
+import { Sparkles, Share2, RefreshCw, Heart } from "lucide-react";
+import { Card } from "@/types/card";
+import { formatBirthdayDate } from "@/lib/utils";
+import { Balloons3D } from "./Balloons3D";
+import { MagicCake } from "./MagicCake";
+import { ConfettiCelebration } from "./ConfettiCelebration";
 
 type Stage =
-  | "intro"
+  | "opening"
   | "balloons"
-  | "cake"
+  | "cake_reveal"
   | "candles"
-  | "cut"
+  | "cake_cutting"
   | "celebration"
   | "letter";
 
-type Props = {
+interface CardExperienceProps {
   card: Card;
-};
-
-/* -------------------------------------------------------
-   BACKGROUND
-------------------------------------------------------- */
-
-function Background() {
-  return (
-    <>
-      <color attach="background" args={["#090616"]} />
-
-      <fog attach="fog" args={["#090616", 8, 18]} />
-
-      <ambientLight intensity={1.8} />
-
-      <spotLight
-        position={[4, 7, 5]}
-        intensity={35}
-        angle={0.5}
-        penumbra={1}
-        castShadow
-      />
-
-      <pointLight
-        position={[-4, 3, 3]}
-        intensity={15}
-        distance={10}
-      />
-
-      <pointLight
-        position={[4, 1, -3]}
-        intensity={12}
-        distance={10}
-      />
-
-      <Environment preset="studio" />
-    </>
-  );
 }
 
-/* -------------------------------------------------------
-   BALLOON
-------------------------------------------------------- */
-
-type BalloonProps = {
-  position: [number, number, number];
-  color: string;
-  popped: boolean;
-  onPop: () => void;
-  delay?: number;
-};
-
-function Balloon({
-  position,
-  color,
-  popped,
-  onPop,
-  delay = 0,
-}: BalloonProps) {
-  const group = useRef<THREE.Group>(null);
-
-  useFrame(({ clock }) => {
-    if (!group.current || popped) return;
-
-    const t = clock.getElapsedTime() + delay;
-
-    group.current.position.y =
-      position[1] + Math.sin(t * 1.2) * 0.18;
-
-    group.current.rotation.z =
-      Math.sin(t * 0.8 + delay) * 0.06;
-  });
-
-  if (popped) return null;
-
-  return (
-    <group
-      ref={group}
-      position={position}
-      onClick={(e) => {
-        e.stopPropagation();
-        onPop();
-      }}
-    >
-      <Float speed={1.2} rotationIntensity={0.15}>
-        <mesh castShadow>
-          <sphereGeometry args={[0.62, 32, 32]} />
-          <meshPhysicalMaterial
-            color={color}
-            roughness={0.18}
-            metalness={0.05}
-            clearcoat={1}
-            clearcoatRoughness={0.08}
-          />
-        </mesh>
-
-        {/* Balloon highlight */}
-        <mesh position={[-0.18, 0.18, 0.52]}>
-          <sphereGeometry args={[0.09, 16, 16]} />
-          <meshBasicMaterial color="#ffffff" transparent opacity={0.75} />
-        </mesh>
-
-        {/* Knot */}
-        <mesh position={[0, -0.65, 0]}>
-          <coneGeometry args={[0.09, 0.16, 12]} />
-          <meshStandardMaterial color={color} />
-        </mesh>
-
-        {/* String */}
-        <mesh position={[0, -1.2, 0]}>
-          <cylinderGeometry args={[0.008, 0.008, 1.1, 8]} />
-          <meshStandardMaterial
-            color="#ffffff"
-            transparent
-            opacity={0.5}
-          />
-        </mesh>
-      </Float>
-    </group>
-  );
-}
-
-/* -------------------------------------------------------
-   CAKE HALF
-------------------------------------------------------- */
-
-type CakeHalfProps = {
-  side: "left" | "right";
-  cut: boolean;
-};
-
-function CakeHalf({ side, cut }: CakeHalfProps) {
-  const isLeft = side === "left";
-
-  const [x, z] = isLeft ? [-0.01, 0] : [0.01, 0];
-
-  return (
-    <group
-      position={[
-        cut ? (isLeft ? -0.75 : 0.75) : x,
-        0,
-        z,
-      ]}
-      rotation-y={isLeft ? 0 : Math.PI}
-    >
-      {/* Main cake */}
-      <mesh castShadow receiveShadow>
-        <cylinderGeometry
-          args={[
-            1.45,
-            1.55,
-            1.15,
-            64,
-            1,
-            false,
-            isLeft ? 0 : Math.PI,
-            Math.PI,
-          ]}
-        />
-
-        <meshStandardMaterial
-          color="#d99a72"
-          roughness={0.65}
-        />
-      </mesh>
-
-      {/* Cream layer */}
-      <mesh
-        position={[0, 0.58, 0]}
-        castShadow
-      >
-        <cylinderGeometry
-          args={[
-            1.5,
-            1.5,
-            0.16,
-            64,
-            1,
-            false,
-            isLeft ? 0 : Math.PI,
-            Math.PI,
-          ]}
-        />
-
-        <meshStandardMaterial
-          color="#fff4e8"
-          roughness={0.4}
-        />
-      </mesh>
-
-      {/* Top frosting */}
-      <mesh
-        position={[0, 0.68, 0]}
-        castShadow
-      >
-        <cylinderGeometry
-          args={[
-            1.35,
-            1.42,
-            0.28,
-            64,
-            1,
-            false,
-            isLeft ? 0 : Math.PI,
-            Math.PI,
-          ]}
-        />
-
-        <meshPhysicalMaterial
-          color="#fffaf4"
-          roughness={0.25}
-          clearcoat={0.7}
-        />
-      </mesh>
-
-      {/* Chocolate / berry decoration */}
-      {[
-        [-0.65, 0.86, 0.25],
-        [-0.25, 0.88, 0.62],
-        [0.2, 0.86, 0.65],
-        [0.65, 0.86, 0.25],
-      ].map((p, i) => (
-        <mesh
-          key={i}
-          position={p as [number, number, number]}
-          castShadow
-        >
-          <sphereGeometry args={[0.11, 20, 20]} />
-          <meshStandardMaterial
-            color={i % 2 === 0 ? "#b51f45" : "#ffcf70"}
-            roughness={0.3}
-          />
-        </mesh>
-      ))}
-    </group>
-  );
-}
-
-/* -------------------------------------------------------
-   CAKE
-------------------------------------------------------- */
-
-function Cake({
-  cut,
-  onCut,
-}: {
-  cut: boolean;
-  onCut?: () => void;
-}) {
-  return (
-    <group
-      position={[0, -1.2, 0]}
-      onClick={(e) => {
-        e.stopPropagation();
-
-        if (!cut && onCut) {
-          onCut();
-        }
-      }}
-    >
-      <CakeHalf side="left" cut={cut} />
-      <CakeHalf side="right" cut={cut} />
-
-      {/* Cake plate */}
-      <mesh position={[0, -0.62, 0]} receiveShadow>
-        <cylinderGeometry args={[1.9, 2.05, 0.12, 64]} />
-        <meshStandardMaterial
-          color="#e8d7ff"
-          metalness={0.15}
-          roughness={0.25}
-        />
-      </mesh>
-
-      {/* Plate rim */}
-      <mesh position={[0, -0.54, 0]}>
-        <torusGeometry args={[1.75, 0.045, 16, 64]} />
-        <meshStandardMaterial
-          color="#ffffff"
-          metalness={0.25}
-          roughness={0.2}
-        />
-      </mesh>
-    </group>
-  );
-}
-
-/* -------------------------------------------------------
-   CANDLE
-------------------------------------------------------- */
-
-type CandleProps = {
-  x: number;
-  lit: boolean;
-  onExtinguish: () => void;
-};
-
-function Candle({ x, lit, onExtinguish }: CandleProps) {
-  const flame = useRef<THREE.Mesh>(null);
-
-  useFrame(({ clock }) => {
-    if (!flame.current || !lit) return;
-
-    const t = clock.getElapsedTime();
-
-    flame.current.scale.y =
-      1 + Math.sin(t * 14 + x) * 0.12;
-
-    flame.current.scale.x =
-      1 + Math.sin(t * 17 + x) * 0.08;
-  });
-
-  return (
-    <group
-      position={[x, 0.3, 0]}
-      onClick={(e) => {
-        e.stopPropagation();
-
-        if (lit) {
-          onExtinguish();
-        }
-      }}
-    >
-      {/* candle body */}
-      <mesh castShadow>
-        <cylinderGeometry args={[0.075, 0.075, 0.65, 20]} />
-        <meshStandardMaterial
-          color="#fff8e9"
-          roughness={0.35}
-        />
-      </mesh>
-
-      {/* candle stripe */}
-      <mesh position={[0, 0.02, 0]}>
-        <torusGeometry args={[0.076, 0.012, 10, 24]} />
-        <meshStandardMaterial color="#d99bff" />
-      </mesh>
-
-      {lit && (
-        <>
-          <mesh
-            ref={flame}
-            position={[0, 0.48, 0]}
-          >
-            <sphereGeometry args={[0.12, 20, 20]} />
-            <meshBasicMaterial color="#ffd76a" />
-          </mesh>
-
-          <pointLight
-            position={[0, 0.5, 0]}
-            intensity={2.5}
-            distance={2}
-          />
-        </>
-      )}
-    </group>
-  );
-}
-
-/* -------------------------------------------------------
-   CANDLES GROUP
-------------------------------------------------------- */
-
-function Candles({
-  lights,
-  onExtinguish,
-}: {
-  lights: boolean[];
-  onExtinguish: (index: number) => void;
-}) {
-  const xs = [-0.72, -0.36, 0, 0.36, 0.72];
-
-  return (
-    <group position={[0, 1.35, 0]}>
-      {xs.map((x, index) => (
-        <Candle
-          key={index}
-          x={x}
-          lit={lights[index]}
-          onExtinguish={() => onExtinguish(index)}
-        />
-      ))}
-    </group>
-  );
-}
-
-/* -------------------------------------------------------
-   CONFETTI
-------------------------------------------------------- */
-
-function Confetti() {
-  const pieces = useMemo(
-    () =>
-      Array.from({ length: 80 }, (_, i) => ({
-        x: (Math.random() - 0.5) * 9,
-        y: Math.random() * 6 + 2,
-        z: (Math.random() - 0.5) * 4,
-        color: [
-          "#ff6b9d",
-          "#ffd166",
-          "#7dd3fc",
-          "#c4b5fd",
-          "#86efac",
-          "#fb7185",
-        ][i % 6],
-        speed: 0.7 + Math.random() * 1.2,
-      })),
-    []
-  );
-
-  return (
-    <group>
-      {pieces.map((p, i) => (
-        <ConfettiPiece key={i} {...p} />
-      ))}
-    </group>
-  );
-}
-
-function ConfettiPiece({
-  x,
-  y,
-  z,
-  color,
-  speed,
-}: {
-  x: number;
-  y: number;
-  z: number;
-  color: string;
-  speed: number;
-}) {
-  const ref = useRef<THREE.Mesh>(null);
-
-  useFrame(({ clock }) => {
-    if (!ref.current) return;
-
-    const t = clock.getElapsedTime();
-
-    ref.current.position.y =
-      y - ((t * speed) % 8);
-
-    ref.current.rotation.x += 0.02;
-    ref.current.rotation.z += 0.025;
-  });
-
-  return (
-    <mesh ref={ref} position={[x, y, z]}>
-      <boxGeometry args={[0.08, 0.18, 0.025]} />
-      <meshStandardMaterial color={color} />
-    </mesh>
-  );
-}
-
-/* -------------------------------------------------------
-   3D SCENE
-------------------------------------------------------- */
-
-function Scene({
-  stage,
-  balloons,
-  popBalloon,
-  candles,
-  extinguishCandle,
-  cutCake,
-}: {
-  stage: Stage;
-  balloons: boolean[];
-  popBalloon: (index: number) => void;
-  candles: boolean[];
-  extinguishCandle: (index: number) => void;
-  cutCake: () => void;
-}) {
-  const showCake =
-    stage === "cake" ||
-    stage === "candles" ||
-    stage === "cut" ||
-    stage === "celebration";
-
-  const showCandles =
-    stage === "candles" ||
-    stage === "cut" ||
-    stage === "celebration";
-
-  return (
-    <>
-      <Background />
-
-      <Sparkles
-        count={90}
-        scale={[10, 7, 5]}
-        size={2}
-        speed={0.35}
-      />
-
-      {stage === "balloons" &&
-        balloons.map((popped, index) => (
-          <Balloon
-            key={index}
-            position={[
-              -3.4 + index * 1.15,
-              1.4 + (index % 2) * 0.55,
-              0,
-            ]}
-            color={[
-              "#ff6b9d",
-              "#7dd3fc",
-              "#c4b5fd",
-              "#ffd166",
-              "#86efac",
-              "#fb7185",
-            ][index]}
-            popped={popped}
-            delay={index * 0.5}
-            onPop={() => popBalloon(index)}
-          />
-        ))}
-
-      {showCake && (
-        <Cake
-          cut={stage === "cut" || stage === "celebration"}
-          onCut={
-            stage === "cut"
-              ? cutCake
-              : undefined
-          }
-        />
-      )}
-
-      {showCandles && (
-        <Candles
-          lights={candles}
-          onExtinguish={extinguishCandle}
-        />
-      )}
-
-      {stage === "celebration" && <Confetti />}
-
-      <ContactShadows
-        position={[0, -2.1, 0]}
-        opacity={0.4}
-        scale={7}
-        blur={2.5}
-      />
-    </>
-  );
-}
-
-/* -------------------------------------------------------
-   MAIN EXPERIENCE
-------------------------------------------------------- */
-
-export default function CardExperience({
-  card,
-}: Props) {
-  const [stage, setStage] =
-    useState<Stage>("intro");
-
-  const [balloons, setBalloons] =
-    useState<boolean[]>(
-      Array(6).fill(false)
-    );
-
-  const [candles, setCandles] =
-    useState<boolean[]>(
-      Array(5).fill(true)
-    );
-
-  const allBalloonsPopped =
-    balloons.every(Boolean);
-
-  const allCandlesOut =
-    candles.every((v) => !v);
-
-  /* Balloon progression */
+export function CardExperience({ card }: CardExperienceProps) {
+  const [stage, setStage] = useState<Stage>("opening");
+  const [poppedBalloons, setPoppedBalloons] = useState<number[]>([]);
+  const [litCandles, setLitCandles] = useState<boolean[]>([true, true, true, true, true]);
+  const [isCakeCut, setIsCakeCut] = useState(false);
+  const [isCuttingAnim, setIsCuttingAnim] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  const formattedDate = formatBirthdayDate(card.birthday_date);
+  const totalBalloons = 7;
+
+  // Auto-advance Stage 2 (Balloons) -> Stage 3 (Cake Reveal)
   useEffect(() => {
-    if (
-      stage === "balloons" &&
-      allBalloonsPopped
-    ) {
+    if (stage === "balloons" && poppedBalloons.length >= totalBalloons) {
       const timer = setTimeout(() => {
-        setStage("cake");
+        setStage("cake_reveal");
+      }, 600);
+      return () => clearTimeout(timer);
+    }
+  }, [poppedBalloons, stage]);
+
+  // Auto-advance Stage 3 -> Stage 4 (Candles)
+  useEffect(() => {
+    if (stage === "cake_reveal") {
+      const timer = setTimeout(() => {
+        setStage("candles");
+      }, 2000);
+      return () => clearTimeout(timer);
+    }
+  }, [stage]);
+
+  // Auto-advance Stage 4 (Candles) -> Stage 5 (Cake Cutting)
+  useEffect(() => {
+    if (stage === "candles" && litCandles.every((lit) => !lit)) {
+      const timer = setTimeout(() => {
+        setStage("cake_cutting");
       }, 800);
-
       return () => clearTimeout(timer);
     }
-  }, [stage, allBalloonsPopped]);
+  }, [litCandles, stage]);
 
-  /* Candle progression */
-  useEffect(() => {
-    if (
-      stage === "candles" &&
-      allCandlesOut
-    ) {
-      const timer = setTimeout(() => {
-        setStage("cut");
-      }, 900);
-
-      return () => clearTimeout(timer);
+  const handlePopBalloon = (id: number) => {
+    if (!poppedBalloons.includes(id)) {
+      setPoppedBalloons((prev) => [...prev, id]);
     }
-  }, [stage, allCandlesOut]);
+  };
 
-  function popBalloon(index: number) {
-    setBalloons((prev) => {
-      const next = [...prev];
-      next[index] = true;
-      return next;
-    });
-  }
+  const handleBlowCandle = (index: number) => {
+    if (litCandles[index]) {
+      setLitCandles((prev) => {
+        const next = [...prev];
+        next[index] = false;
+        return next;
+      });
+    }
+  };
 
-  function extinguishCandle(index: number) {
-    setCandles((prev) => {
-      const next = [...prev];
-      next[index] = false;
-      return next;
-    });
-  }
+  const handleCutCake = () => {
+    setIsCuttingAnim(true);
+    setTimeout(() => {
+      setIsCakeCut(true);
+      setTimeout(() => {
+        setIsCuttingAnim(false);
+        setStage("celebration");
+      }, 1000);
+    }, 600);
+  };
 
-  function startExperience() {
-    setStage("balloons");
-  }
+  const handleShare = async () => {
+    const shareData = {
+      title: `Magic Card for ${card.recipient_name}`,
+      text: `${card.recipient_name}, someone sent you a magical birthday surprise! ✨`,
+      url: window.location.href,
+    };
 
-  function beginCandles() {
-    setStage("candles");
-  }
-
-  function cutCake() {
-    setStage("celebration");
-  }
-
-  async function shareCard() {
-    const url = window.location.href;
-
-    try {
-      if (navigator.share) {
-        await navigator.share({
-          title: "A Magic Card For You ✨",
-          text: `A special card from ${card.sender_name || "someone special"}`,
-          url,
-        });
-      } else {
-        await navigator.clipboard.writeText(url);
-        alert("Card link copied!");
+    if (navigator.share) {
+      try {
+        await navigator.share(shareData);
+      } catch {
+        // User canceled or share failed
       }
-    } catch {
-      // user cancelled share
+    } else {
+      await navigator.clipboard.writeText(window.location.href);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2500);
     }
-  }
+  };
 
   return (
-    <main className="relative min-h-screen overflow-hidden bg-[#090616] text-white">
-      {/* 3D */}
-      <div className="absolute inset-0">
-        <Canvas
-          shadows
-          camera={{
-            position: [0, 1, 8],
-            fov: 42,
-          }}
-          dpr={[1, 1.75]}
-          gl={{
-            antialias: true,
-            alpha: false,
-          }}
-        >
-          <Scene
-            stage={stage}
-            balloons={balloons}
-            popBalloon={popBalloon}
-            candles={candles}
-            extinguishCandle={extinguishCandle}
-            cutCake={cutCake}
+    <div className="relative w-full h-screen overflow-hidden bg-gradient-to-b from-slate-950 via-purple-950 to-slate-900 select-none text-white">
+      {/* Background Ambient Glow */}
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_rgba(236,72,153,0.15)_0%,_transparent_70%)] pointer-events-none" />
+
+      {/* 3D Canvas Scene */}
+      <Canvas shadows className="absolute inset-0 z-0">
+        <PerspectiveCamera makeDefault position={[0, 1.2, 5]} fov={50} />
+        <OrbitControls
+          enableZoom={false}
+          enablePan={false}
+          maxPolarAngle={Math.PI / 2 + 0.1}
+          minPolarAngle={Math.PI / 4}
+        />
+
+        <ambientLight intensity={0.7} />
+        <directionalLight
+          position={[5, 8, 5]}
+          intensity={1.2}
+          castShadow
+          shadow-mapSize-width={1024}
+          shadow-mapSize-height={1024}
+        />
+        <pointLight position={[-4, 3, -2]} intensity={0.5} color="#A855F7" />
+
+        {/* Stage 2 Balloons */}
+        {stage === "balloons" && (
+          <Balloons3D
+            total={totalBalloons}
+            poppedIds={poppedBalloons}
+            onPopBalloon={handlePopBalloon}
           />
-        </Canvas>
-      </div>
+        )}
 
-      {/* INTRO */}
-      {stage === "intro" && (
-        <div className="absolute inset-0 z-20 flex items-center justify-center px-6">
-          <div className="w-full max-w-md text-center">
-            <div className="mb-5 text-sm uppercase tracking-[0.35em] text-white/60">
-              A little magic for you
-            </div>
+        {/* Stages 3 to 7: Birthday Cake Scene */}
+        {stage !== "opening" && stage !== "balloons" && (
+          <MagicCake
+            isCut={isCakeCut}
+            litCandles={litCandles}
+            onBlowCandle={handleBlowCandle}
+            showKnife={isCuttingAnim}
+            isCuttingAnimation={isCuttingAnim}
+          />
+        )}
 
-            <h1 className="mb-4 text-4xl font-semibold tracking-tight sm:text-6xl">
-              Something Special
-            </h1>
+        {/* Confetti Celebration Particle Layer */}
+        <ConfettiCelebration active={stage === "celebration" || stage === "letter"} />
 
-            <p className="mx-auto mb-9 max-w-sm text-sm leading-6 text-white/65">
-              {card.recipient_name}, someone has
-              prepared a little surprise just for you.
-            </p>
+        <ContactShadows
+          position={[0, -0.75, 0]}
+          opacity={0.6}
+          scale={8}
+          blur={1.5}
+          far={4}
+        />
+      </Canvas>
 
-            <button
-              type="button"
-              onClick={startExperience}
-              className="group relative mx-auto flex min-h-16 cursor-pointer items-center justify-center rounded-full border border-white/30 bg-white/15 px-9 text-sm font-semibold tracking-[0.18em] text-white shadow-[0_0_50px_rgba(210,170,255,0.35)] backdrop-blur-xl transition duration-300 hover:scale-105 hover:bg-white/25 active:scale-95"
+      {/* Framer Motion Overlay UI */}
+      <div className="relative z-10 w-full h-full pointer-events-none flex flex-col justify-between p-6">
+        {/* Header / Top Progress Banners */}
+        <header className="w-full flex justify-center pt-4">
+          <AnimatePresence mode="wait">
+            {stage === "balloons" && (
+              <motion.div
+                key="banner-balloons"
+                initial={{ opacity: 0, y: -20 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -20 }}
+                className="bg-white/10 backdrop-blur-md px-6 py-2.5 rounded-full border border-white/20 shadow-lg text-center"
+              >
+                <p className="text-sm font-medium tracking-wide text-pink-200">
+                  Tap the balloons 🎈 ({poppedBalloons.length} / {totalBalloons})
+                </p>
+              </motion.div>
+            )}
+
+            {stage === "candles" && (
+              <motion.div
+                key="banner-candles"
+                initial={{ opacity: 0, y: -20 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -20 }}
+                className="bg-white/10 backdrop-blur-md px-6 py-2.5 rounded-full border border-white/20 shadow-lg text-center"
+              >
+                <p className="text-sm font-medium tracking-wide text-amber-200">
+                  Make a wish 🕯️ Tap each candle to blow it out
+                </p>
+              </motion.div>
+            )}
+
+            {stage === "celebration" && (
+              <motion.div
+                key="banner-celebration"
+                initial={{ opacity: 0, scale: 0.8 }}
+                animate={{ opacity: 1, scale: 1 }}
+                className="text-center"
+              >
+                <h1 className="text-3xl md:text-5xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-pink-400 via-purple-300 to-amber-300 drop-shadow-md">
+                  Happy Birthday, {card.recipient_name}! 🎉
+                </h1>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </header>
+
+        {/* Stage Dynamic Center Interfaces */}
+        <main className="flex-1 flex items-center justify-center pointer-events-auto">
+          {/* Stage 1: Opening Experience */}
+          {stage === "opening" && (
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className="text-center max-w-md p-8 rounded-3xl bg-white/10 backdrop-blur-xl border border-white/20 shadow-2xl space-y-6"
             >
-              <span className="absolute inset-0 -z-10 rounded-full bg-white/10 blur-xl transition group-hover:bg-white/20" />
-
-              OPEN YOUR SURPRISE
-            </button>
-
-            <div className="mt-5 text-xs text-white/35">
-              Tap to begin ✨
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* BALLOON INSTRUCTION */}
-      {stage === "balloons" && (
-        <div className="pointer-events-none absolute inset-x-0 top-10 z-20 text-center">
-          <div className="text-xs uppercase tracking-[0.3em] text-white/50">
-            Step 1
-          </div>
-
-          <h2 className="mt-2 text-2xl font-medium">
-            Pop the balloons 🎈
-          </h2>
-
-          <p className="mt-2 text-sm text-white/55">
-            Tap each balloon
-          </p>
-
-          <div className="mt-4 text-xs text-white/35">
-            {balloons.filter(Boolean).length}/6 popped
-          </div>
-        </div>
-      )}
-
-      {/* CAKE INTRO */}
-      {stage === "cake" && (
-        <div className="absolute inset-x-0 top-10 z-20 text-center">
-          <div className="text-xs uppercase tracking-[0.3em] text-white/50">
-            Step 2
-          </div>
-
-          <h2 className="mt-2 text-3xl font-semibold">
-            Your cake is here 🎂
-          </h2>
-
-          <p className="mt-2 text-sm text-white/55">
-            Get ready for the candles
-          </p>
-
-          <button
-            type="button"
-            onClick={beginCandles}
-            className="mt-6 cursor-pointer rounded-full border border-white/25 bg-white/15 px-7 py-3 text-sm font-semibold backdrop-blur-xl transition hover:bg-white/25 active:scale-95"
-          >
-            LIGHT THE MOMENT ✨
-          </button>
-        </div>
-      )}
-
-      {/* CANDLES */}
-      {stage === "candles" && (
-        <div className="pointer-events-none absolute inset-x-0 top-10 z-20 text-center">
-          <div className="text-xs uppercase tracking-[0.3em] text-white/50">
-            Step 3
-          </div>
-
-          <h2 className="mt-2 text-3xl font-semibold">
-            Make a wish 🕯️
-          </h2>
-
-          <p className="mt-2 text-sm text-white/55">
-            Tap each candle to blow it out
-          </p>
-        </div>
-      )}
-
-      {/* CUT */}
-      {stage === "cut" && (
-        <div className="absolute inset-x-0 bottom-10 z-20 flex justify-center px-6">
-          <button
-            type="button"
-            onClick={cutCake}
-            className="cursor-pointer rounded-full border border-white/30 bg-white/15 px-9 py-4 text-sm font-semibold tracking-[0.18em] shadow-[0_0_40px_rgba(255,255,255,0.12)] backdrop-blur-xl transition hover:scale-105 hover:bg-white/25 active:scale-95"
-          >
-            🔪 CUT THE CAKE
-          </button>
-        </div>
-      )}
-
-      {/* CELEBRATION */}
-      {stage === "celebration" && (
-        <div className="absolute inset-0 z-20 flex items-end justify-center px-6 pb-10 text-center">
-          <div className="w-full max-w-lg rounded-[2rem] border border-white/15 bg-black/20 p-6 backdrop-blur-xl">
-            <div className="text-xs uppercase tracking-[0.3em] text-white/45">
-              The magic is yours
-            </div>
-
-            <h2 className="mt-3 text-4xl font-semibold">
-              Happy Birthday,
-            </h2>
-
-            <div className="mt-1 text-3xl font-medium text-white/85">
-              {card.recipient_name}! 🎉
-            </div>
-
-            <p className="mx-auto mt-4 max-w-md text-sm leading-6 text-white/60">
-              {card.message}
-            </p>
-
-            <button
-              type="button"
-              onClick={() => setStage("letter")}
-              className="mt-6 cursor-pointer rounded-full bg-white px-8 py-3 text-sm font-semibold text-black transition hover:scale-105 active:scale-95"
-            >
-              OPEN YOUR LETTER 💌
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* LETTER */}
-      {stage === "letter" && (
-        <div className="absolute inset-0 z-30 flex items-center justify-center overflow-y-auto bg-black/30 px-5 py-10 backdrop-blur-md">
-          <div className="w-full max-w-xl rounded-[2rem] border border-white/15 bg-white/10 p-7 shadow-2xl backdrop-blur-2xl sm:p-10">
-            <div className="text-center">
-              <div className="text-xs uppercase tracking-[0.3em] text-white/45">
-                A little message
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-pink-500/20 text-pink-300 text-xs font-semibold tracking-wider uppercase">
+                <Sparkles className="w-3.5 h-3.5" /> Something Special For You ✨
               </div>
 
-              <h2 className="mt-3 text-4xl font-semibold">
-                For {card.recipient_name}
-              </h2>
-            </div>
+              <h1 className="text-4xl md:text-5xl font-extrabold text-white tracking-tight">
+                {card.recipient_name}
+              </h1>
 
-            <div className="mt-8 rounded-3xl border border-white/10 bg-black/15 p-6">
-              <p className="whitespace-pre-wrap text-center text-base leading-8 text-white/80">
-                {card.message}
+              <p className="text-slate-300 text-sm md:text-base leading-relaxed">
+                Someone made a little magic specifically for you today.
               </p>
-            </div>
 
-            <div className="mt-7 text-center text-sm text-white/45">
-              With love,
-              <br />
-              <span className="text-white/75">
-                {card.sender_name || "Someone special"}
-              </span>
-            </div>
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                animate={{
+                  boxShadow: [
+                    "0 0 15px rgba(236,72,153,0.4)",
+                    "0 0 30px rgba(236,72,153,0.8)",
+                    "0 0 15px rgba(236,72,153,0.4)",
+                  ],
+                }}
+                transition={{ duration: 2, repeat: Infinity }}
+                onClick={() => setStage("balloons")}
+                className="w-full py-4 px-8 rounded-2xl bg-gradient-to-r from-pink-500 via-purple-500 to-indigo-500 text-white font-bold text-lg shadow-xl cursor-pointer border border-white/30"
+              >
+                OPEN YOUR SURPRISE 🎁
+              </motion.button>
+            </motion.div>
+          )}
 
-            <button
-              type="button"
-              onClick={shareCard}
-              className="mt-8 w-full cursor-pointer rounded-full border border-white/20 bg-white/10 py-4 text-sm font-semibold backdrop-blur-xl transition hover:bg-white/20 active:scale-[0.98]"
+          {/* Stage 5: Cake Cutting Interactive Button */}
+          {stage === "cake_cutting" && (
+            <motion.div
+              initial={{ opacity: 0, y: 30 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="text-center"
             >
-              SHARE THIS MAGIC ✨
-            </button>
-          </div>
-        </div>
-      )}
-    </main>
+              <motion.button
+                whileHover={{ scale: 1.08 }}
+                whileTap={{ scale: 0.92 }}
+                animate={{ scale: [1, 1.03, 1] }}
+                transition={{ duration: 1.5, repeat: Infinity }}
+                onClick={handleCutCake}
+                disabled={isCuttingAnim}
+                className="py-4 px-10 rounded-2xl bg-gradient-to-r from-amber-500 via-pink-500 to-purple-600 text-white font-extrabold text-xl shadow-2xl cursor-pointer border border-amber-200/40 tracking-wider"
+              >
+                🔪 CUT THE CAKE
+              </motion.button>
+            </motion.div>
+          )}
+
+          {/* Stage 6 Transition to Letter */}
+          {stage === "celebration" && (
+            <motion.div
+              initial={{ opacity: 0, y: 40 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 1 }}
+              className="mt-auto mb-6"
+            >
+              <button
+                onClick={() => setStage("letter")}
+                className="py-3 px-8 rounded-full bg-white/20 hover:bg-white/30 backdrop-blur-md border border-white/30 text-white font-semibold text-sm tracking-wide transition shadow-lg cursor-pointer"
+              >
+                READ YOUR LETTER 💌
+              </button>
+            </motion.div>
+          )}
+
+          {/* Stage 7 & 8: Personalized Letter & Sharing */}
+          {stage === "letter" && (
+            <motion.div
+              initial={{ opacity: 0, y: 30, scale: 0.95 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              className="w-full max-w-lg p-8 rounded-3xl bg-slate-900/80 backdrop-blur-2xl border border-pink-500/30 shadow-2xl space-y-6 text-left my-auto"
+            >
+              <div className="flex items-center justify-between border-b border-white/10 pb-4">
+                <h2 className="text-2xl font-bold text-pink-300">
+                  Dear {card.recipient_name},
+                </h2>
+                {formattedDate && (
+                  <span className="text-xs font-medium text-slate-400 bg-white/5 px-3 py-1 rounded-full border border-white/10">
+                    {formattedDate}
+                  </span>
+                )}
+              </div>
+
+              {/* Dynamic Personalized Message Body with preserved whitespace */}
+              <div className="text-slate-200 leading-relaxed text-sm md:text-base whitespace-pre-wrap max-h-60 overflow-y-auto pr-2">
+                {card.message}
+              </div>
+
+              <div className="border-t border-white/10 pt-4 text-right">
+                <p className="text-xs text-slate-400 uppercase tracking-widest">With love,</p>
+                <p className="text-lg font-bold text-pink-400">
+                  {card.sender_name || "Someone special"}
+                </p>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="pt-2 flex flex-col sm:flex-row gap-3">
+                <motion.button
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  onClick={handleShare}
+                  className="flex-1 py-3.5 px-6 rounded-xl bg-gradient-to-r from-pink-500 to-purple-600 text-white font-bold text-sm flex items-center justify-center gap-2 shadow-lg cursor-pointer"
+                >
+                  <Share2 className="w-4 h-4" />
+                  {copied ? "LINK COPIED! ✨" : "SHARE THIS MAGIC ✨"}
+                </motion.button>
+
+                <button
+                  onClick={() => {
+                    setPoppedBalloons([]);
+                    setLitCandles([true, true, true, true, true]);
+                    setIsCakeCut(false);
+                    setStage("opening");
+                  }}
+                  className="py-3.5 px-5 rounded-xl bg-white/10 hover:bg-white/20 border border-white/20 text-slate-200 font-semibold text-sm flex items-center justify-center gap-2 transition cursor-pointer"
+                >
+                  <RefreshCw className="w-4 h-4" /> REPLAY
+                </button>
+              </div>
+            </motion.div>
+          )}
+        </main>
+
+        {/* Footer */}
+        <footer className="w-full text-center pb-2">
+          <p className="text-xs text-slate-500 flex items-center justify-center gap-1">
+            Made with <Heart className="w-3 h-3 text-pink-500 fill-pink-500" /> on MagicCards
+          </p>
+        </footer>
+      </div>
+    </div>
   );
 }
