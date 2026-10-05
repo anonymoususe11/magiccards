@@ -1,13 +1,19 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Canvas, useFrame } from "@react-three/fiber";
+import { Float, OrbitControls, Sparkles } from "@react-three/drei";
 import { motion } from "framer-motion";
+import { useRef, useState } from "react";
+import * as THREE from "three";
 import type { Card } from "@/types/card";
 
-const content: Record<string, {
-  emoji: string;
-  title: string;
-}> = {
+const content: Record<
+  string,
+  {
+    emoji: string;
+    title: string;
+  }
+> = {
   birthday: {
     emoji: "🎂",
     title: "Happy Birthday!"
@@ -58,111 +64,81 @@ const content: Record<string, {
   }
 };
 
-export default function CardExperience({
-  card
-}: {
-  card: Card;
-}) {
-  const [stage, setStage] = useState(0);
-  const [muted, setMuted] = useState(false);
+function Flame() {
+  const flame = useRef<THREE.Mesh>(null);
 
-  const info = content[card.type] || content.custom;
+  useFrame(({ clock }) => {
+    if (!flame.current) return;
 
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setStage(1);
-    }, 1300);
+    const t = clock.getElapsedTime();
 
-    return () => clearTimeout(timer);
-  }, []);
+    flame.current.scale.x = 0.85 + Math.sin(t * 8) * 0.12;
+    flame.current.scale.y = 1 + Math.sin(t * 7) * 0.15;
+    flame.current.rotation.z = Math.sin(t * 6) * 0.12;
+  });
 
   return (
-    <main
-      className="relative flex min-h-screen items-center justify-center overflow-hidden px-5 py-10"
-    >
-      <div className="pointer-events-none absolute inset-0">
-        {Array.from({ length: 24 }).map((_, i) => (
-          <motion.div
-            key={i}
-            className="absolute text-xl"
-            initial={{
-              x: `${(i * 47) % 100}%`,
-              y: "110%",
-              opacity: 0
-            }}
-            animate={{
-              y: "-20%",
-              opacity: [0, 1, 1, 0]
-            }}
-            transition={{
-              duration: 7 + (i % 4),
-              delay: i * 0.18,
-              repeat: Infinity
-            }}
-          >
-            {["✨", "🎈", "⭐", "💫"][i % 4]}
-          </motion.div>
-        ))}
-      </div>
-
-      <motion.section
-        initial={{ opacity: 0, scale: .92 }}
-        animate={{ opacity: 1, scale: 1 }}
-        transition={{ duration: .7 }}
-        className="glass glow card-shadow relative z-10 w-full max-w-2xl rounded-[2rem] p-8 text-center md:p-12"
-      >
-        <div className="text-7xl">
-          {info.emoji}
-        </div>
-
-        <motion.div
-          initial={{ opacity: 0, y: 12 }}
-          animate={{
-            opacity: stage >= 1 ? 1 : 0,
-            y: stage >= 1 ? 0 : 12
-          }}
-          transition={{ delay: .25 }}
-        >
-          <p className="mt-8 text-sm uppercase tracking-[.35em] text-white/40">
-            A message for
-          </p>
-
-          <h1 className="mt-3 text-4xl font-black md:text-6xl">
-            {card.recipient_name}
-          </h1>
-
-          <h2 className="mt-5 text-2xl font-bold">
-            {info.title}
-          </h2>
-
-          <div className="mx-auto mt-8 max-w-xl whitespace-pre-wrap text-lg leading-8 text-white/65">
-            {card.message}
-          </div>
-
-          {card.sender_name && (
-            <p className="mt-9 text-white/45">
-              With love & good wishes,
-              <br />
-              <span className="font-semibold text-white/80">
-                {card.sender_name}
-              </span>
-            </p>
-          )}
-
-          {card.type === "birthday" && (
-            <div className="mt-10 text-6xl">
-              🎂 🕯️ 🎈 🎁
-            </div>
-          )}
-
-          <button
-            onClick={() => setMuted(!muted)}
-            className="mt-10 rounded-full border border-white/10 bg-white/5 px-5 py-2 text-sm text-white/60 hover:bg-white/10"
-          >
-            {muted ? "🔇 Muted" : "🔊 Sound"}
-          </button>
-        </motion.div>
-      </motion.section>
-    </main>
+    <mesh ref={flame} position={[0, 1.15, 0]}>
+      <sphereGeometry args={[0.13, 16, 16]} />
+      <meshStandardMaterial
+        color="#ffd166"
+        emissive="#ff8c00"
+        emissiveIntensity={2}
+      />
+    </mesh>
   );
 }
+
+function Candle({ position }: { position: [number, number, number] }) {
+  return (
+    <group position={position}>
+      <mesh>
+        <cylinderGeometry args={[0.075, 0.075, 0.65, 20]} />
+        <meshStandardMaterial color="#ff7eb6" />
+      </mesh>
+
+      <Flame />
+    </group>
+  );
+}
+
+function Cake() {
+  const cake = useRef<THREE.Group>(null);
+
+  useFrame(({ clock }) => {
+    if (!cake.current) return;
+
+    const t = clock.getElapsedTime();
+
+    cake.current.rotation.y = Math.sin(t * 0.35) * 0.12;
+    cake.current.position.y = Math.sin(t * 0.8) * 0.05;
+  });
+
+  return (
+    <Float
+      speed={1.4}
+      rotationIntensity={0.15}
+      floatIntensity={0.35}
+    >
+      <group ref={cake}>
+        {/* Bottom cake */}
+        <mesh position={[0, 0, 0]}>
+          <cylinderGeometry args={[1.75, 1.85, 0.8, 64]} />
+          <meshStandardMaterial
+            color="#ff8fab"
+            roughness={0.35}
+          />
+        </mesh>
+
+        {/* Cream layer */}
+        <mesh position={[0, 0.48, 0]}>
+          <cylinderGeometry args={[1.55, 1.65, 0.18, 64]} />
+          <meshStandardMaterial
+            color="#fff1f7"
+            roughness={0.25}
+          />
+        </mesh>
+
+        {/* Top cake */}
+        <mesh position={[0, 0.78, 0]}>
+          <cylinderGeometry args={[1.35, 1.45, 0.
