@@ -6,6 +6,9 @@ export interface Card {
   message: string;
   birthday_date?: string | null;
   theme?: string | null;
-  extra_data?: Record<string, any> | null;
+  photo_url?: string | null;
+  music_url?: string | null;
+  extra_data?: Record<string, unknown> | null;
   created_at?: string;
+  expires_at?: string | null;
 }
