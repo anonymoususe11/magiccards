@@ -1,11 +1,11 @@
 "use client";
 
-import { FormEvent, useMemo, useState } from "react";
+import { FormEvent, Suspense, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { CARD_TYPES } from "@/lib/card-config";
 
-export default function CreatePage() {
+function CreateCardForm() {
   const searchParams = useSearchParams();
 
   const initialType =
@@ -220,5 +220,13 @@ export default function CreatePage() {
         </div>
       </div>
     </main>
+  );
+}
+
+export default function CreatePage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen" />}>
+      <CreateCardForm />
+    </Suspense>
   );
 }
