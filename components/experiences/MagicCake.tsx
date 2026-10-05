@@ -1,252 +1,399 @@
 "use client";
 
-import React, { useRef, useState } from "react";
-import { useFrame } from "@react-three/fiber";
+import { useEffect, useRef } from "react";
+import { Canvas, useFrame } from "@react-three/fiber";
+import { Float, OrbitControls } from "@react-three/drei";
 import * as THREE from "three";
 
-interface CandleProps {
-  index: number;
-  position: [number, number, number];
-  isLit: boolean;
-  onBlowOut: (index: number) => void;
+interface MagicCakeProps {
+  candlesOut: number[];
+  onCandleClick: (id: number) => void;
+  cut: boolean;
 }
 
-const Candle = ({ index, position, isLit, onBlowOut }: CandleProps) => {
-  const flameRef = useRef<THREE.Group>(null);
-  const lightRef = useRef<THREE.PointLight>(null);
+function Candle({
+  id,
+  extinguished,
+  onClick,
+  x,
+}: {
+  id: number;
+  extinguished: boolean;
+  onClick: () => void;
+  x: number;
+}) {
+  const flameRef = useRef<THREE.Mesh>(null);
 
-  useFrame((state) => {
-    if (isLit && flameRef.current && lightRef.current) {
-      const t = state.clock.getElapsedTime() * 8 + index;
-      const flicker = Math.sin(t) * 0.15 + Math.cos(t * 1.7) * 0.1;
-      flameRef.current.scale.setScalar(1 + flicker * 0.3);
-      lightRef.current.intensity = 1.2 + flicker * 0.4;
-    }
+  useFrame(({ clock }) => {
+    if (!flameRef.current) return;
+
+    const time = clock.getElapsedTime();
+
+    flameRef.current.scale.x =
+      0.85 + Math.sin(time * 10 + id) * 0.12;
+
+    flameRef.current.scale.y =
+      1 + Math.sin(time * 13 + id) * 0.15;
   });
 
   return (
-    <group position={position}>
-      {/* Candle Body */}
-      <mesh position={[0, 0.25, 0]} castShadow>
-        <cylinderGeometry args={[0.035, 0.035, 0.5, 16]} />
-        <meshStandardMaterial color="#FFF8E7" roughness={0.3} />
+    <group
+      position={[x, 2.25, 0]}
+      onClick={(event) => {
+        event.stopPropagation();
+        if (!extinguished) onClick();
+      }}
+    >
+      <mesh>
+        <cylinderGeometry args={[0.09, 0.09, 0.75, 24]} />
+        <meshStandardMaterial
+          color={id % 2 === 0 ? "#fff4cf" : "#ffd5e5"}
+          roughness={0.35}
+        />
       </mesh>
 
-      {/* Decorative Spiral Stripe */}
-      <mesh position={[0, 0.25, 0]}>
-        <cylinderGeometry args={[0.038, 0.038, 0.48, 16]} />
-        <meshStandardMaterial color="#FF4081" roughness={0.4} transparent opacity={0.4} />
-      </mesh>
-
-      {/* Wick */}
-      <mesh position={[0, 0.52, 0]}>
-        <cylinderGeometry args={[0.006, 0.006, 0.08, 8]} />
-        <meshStandardMaterial color="#222" />
-      </mesh>
-
-      {/* Flame & Light */}
-      {isLit && (
-        <group
+      {!extinguished && (
+        <mesh
           ref={flameRef}
-          position={[0, 0.6, 0]}
-          onClick={(e) => {
-            e.stopPropagation();
-            onBlowOut(index);
-          }}
+          position={[0, 0.55, 0]}
         >
-          <mesh>
-            <coneGeometry args={[0.045, 0.12, 12]} />
-            <meshBasicMaterial color="#FF9800" />
-          </mesh>
-          <mesh position={[0, -0.01, 0]}>
-            <coneGeometry args={[0.025, 0.08, 12]} />
-            <meshBasicMaterial color="#FFEB3B" />
-          </mesh>
-          <pointLight
-            ref={lightRef}
-            color="#FF9800"
-            intensity={1.5}
-            distance={2.5}
-            decay={2}
+          <sphereGeometry args={[0.13, 16, 16]} />
+          <meshStandardMaterial
+            color="#ff9d28"
+            emissive="#ff5a00"
+            emissiveIntensity={3}
           />
-        </group>
+        </mesh>
       )}
     </group>
   );
-};
-
-const Strawberry = ({ position }: { position: [number, number, number] }) => (
-  <group position={position}>
-    <mesh castShadow>
-      <coneGeometry args={[0.07, 0.12, 12]} />
-      <meshStandardMaterial color="#D50000" roughness={0.25} metalness={0.1} />
-    </mesh>
-    <mesh position={[0, 0.06, 0]}>
-      <cylinderGeometry args={[0.03, 0, 0.02, 6]} />
-      <meshStandardMaterial color="#2E7D32" />
-    </mesh>
-  </group>
-);
-
-interface MagicCakeProps {
-  isCut: boolean;
-  litCandles: boolean[];
-  onBlowCandle: (index: number) => void;
-  showKnife: boolean;
-  isCuttingAnimation: boolean;
 }
 
-export function MagicCake({
-  isCut,
-  litCandles,
-  onBlowCandle,
-  showKnife,
-  isCuttingAnimation,
+function CakeModel({
+  candlesOut,
+  onCandleClick,
+  cut,
 }: MagicCakeProps) {
-  const mainGroupRef = useRef<THREE.Group>(null);
-  const leftHalfRef = useRef<THREE.Group>(null);
-  const rightHalfRef = useRef<THREE.Group>(null);
+  const leftRef = useRef<THREE.Group>(null);
+  const rightRef = useRef<THREE.Group>(null);
+
   const knifeRef = useRef<THREE.Group>(null);
 
-  const [knifeY, setKnifeY] = useState(2.2);
+  useEffect(() => {
+    if (!cut) {
+      if (leftRef.current) {
+        leftRef.current.position.x = 0;
+      }
 
-  useFrame((state) => {
-    // Gentle idle float
-    if (mainGroupRef.current) {
-      const t = state.clock.getElapsedTime();
-      mainGroupRef.current.position.y = Math.sin(t * 1.2) * 0.04 - 0.2;
-      mainGroupRef.current.rotation.y = Math.sin(t * 0.5) * 0.08;
+      if (rightRef.current) {
+        rightRef.current.position.x = 0;
+      }
+
+      if (knifeRef.current) {
+        knifeRef.current.position.y = 4;
+        knifeRef.current.rotation.z = 0;
+      }
+
+      return;
     }
 
-    // Knife Slicing Animation lerp
-    if (isCuttingAnimation && knifeRef.current) {
-      setKnifeY((prev) => THREE.MathUtils.lerp(prev, 0.2, 0.08));
-    }
+    let start: number | null = null;
+    let frame = 0;
 
-    // Split Halves Separation lerp
-    const targetSeparation = isCut ? 0.35 : 0;
-    if (leftHalfRef.current) {
-      leftHalfRef.current.position.x = THREE.MathUtils.lerp(
-        leftHalfRef.current.position.x,
-        -targetSeparation,
-        0.06
+    const animate = (time: number) => {
+      if (start === null) start = time;
+
+      const progress = Math.min(
+        (time - start) / 900,
+        1
       );
-    }
-    if (rightHalfRef.current) {
-      rightHalfRef.current.position.x = THREE.MathUtils.lerp(
-        rightHalfRef.current.position.x,
-        targetSeparation,
-        0.06
-      );
-    }
-  });
 
-  // Candle placements on upper tier: 2 on Left half, 3 on Right half
-  const candlesConfig: Array<{ index: number; position: [number, number, number]; side: "left" | "right" }> = [
-    { index: 0, position: [-0.35, 1.0, 0.2], side: "left" },
-    { index: 1, position: [-0.35, 1.0, -0.2], side: "left" },
-    { index: 2, position: [0.35, 1.0, 0.3], side: "right" },
-    { index: 3, position: [0.35, 1.0, -0.3], side: "right" },
-    { index: 4, position: [0.1, 1.0, 0.4], side: "right" },
-  ];
+      const eased =
+        1 - Math.pow(1 - progress, 3);
 
-  const renderCakeHalf = (side: "left" | "right") => {
-    // Left side: thetaStart = PI/2, thetaLength = PI
-    // Right side: thetaStart = -PI/2, thetaLength = PI
-    const thetaStart = side === "left" ? Math.PI / 2 : -Math.PI / 2;
-    const thetaLength = Math.PI;
+      if (leftRef.current) {
+        leftRef.current.position.x =
+          -0.65 * eased;
+      }
 
-    return (
-      <group>
-        {/* Tier 1 - Bottom Tier */}
-        <mesh position={[0, 0.3, 0]} castShadow receiveShadow>
-          <cylinderGeometry args={[1.5, 1.5, 0.6, 32, 1, false, thetaStart, thetaLength]} />
-          <meshStandardMaterial color="#FFF5E1" roughness={0.3} />
-        </mesh>
+      if (rightRef.current) {
+        rightRef.current.position.x =
+          0.65 * eased;
+      }
 
-        {/* Tier 1 Frosting Trim */}
-        <mesh position={[0, 0.6, 0]}>
-          <cylinderGeometry args={[1.53, 1.53, 0.08, 32, 1, false, thetaStart, thetaLength]} />
-          <meshStandardMaterial color="#FF69B4" roughness={0.2} />
-        </mesh>
+      if (knifeRef.current) {
+        knifeRef.current.position.y =
+          4 - 3.7 * eased;
 
-        {/* Tier 2 - Top Tier */}
-        <mesh position={[0, 0.8, 0]} castShadow receiveShadow>
-          <cylinderGeometry args={[1.0, 1.0, 0.5, 32, 1, false, thetaStart, thetaLength]} />
-          <meshStandardMaterial color="#FFF5E1" roughness={0.3} />
-        </mesh>
+        knifeRef.current.rotation.z =
+          -0.18 * eased;
+      }
 
-        {/* Top Cream Frosting Layer */}
-        <mesh position={[0, 1.05, 0]}>
-          <cylinderGeometry args={[1.02, 1.02, 0.06, 32, 1, false, thetaStart, thetaLength]} />
-          <meshStandardMaterial color="#F8BBD0" roughness={0.15} />
-        </mesh>
+      if (progress < 1) {
+        frame = requestAnimationFrame(animate);
+      }
+    };
 
-        {/* Inner Sponge/Cream Filling Texture Plane on Cut Face */}
-        <mesh position={[0, 0.55, 0]} rotation={[0, side === "left" ? Math.PI / 2 : -Math.PI / 2, 0]}>
-          <planeGeometry args={[3.0, 1.1]} />
-          <meshStandardMaterial color="#FFE0B2" roughness={0.6} />
-        </mesh>
+    frame = requestAnimationFrame(animate);
 
-        {/* Strawberries */}
-        {side === "left" ? (
-          <>
-            <Strawberry position={[-0.6, 1.12, 0.3]} />
-            <Strawberry position={[-0.6, 1.12, -0.3]} />
-          </>
-        ) : (
-          <>
-            <Strawberry position={[0.6, 1.12, 0.4]} />
-            <Strawberry position={[0.6, 1.12, -0.4]} />
-            <Strawberry position={[0.8, 1.12, 0]} />
-          </>
-        )}
-
-        {/* Candles assigned to this side */}
-        {candlesConfig
-          .filter((c) => c.side === side)
-          .map((c) => (
-            <Candle
-              key={c.index}
-              index={c.index}
-              position={c.position}
-              isLit={litCandles[c.index]}
-              onBlowOut={onBlowCandle}
-            />
-          ))}
-      </group>
-    );
-  };
+    return () => cancelAnimationFrame(frame);
+  }, [cut]);
 
   return (
-    <group ref={mainGroupRef} position={[0, -0.2, 0]}>
-      {/* Base Plate */}
-      <mesh position={[0, -0.05, 0]} receiveShadow>
-        <cylinderGeometry args={[1.9, 2.0, 0.1, 48]} />
-        <meshStandardMaterial color="#FFFFFF" roughness={0.1} metalness={0.1} />
-      </mesh>
+    <>
+      <ambientLight intensity={1.3} />
 
-      {/* Cake Left Half */}
-      <group ref={leftHalfRef}>{renderCakeHalf("left")}</group>
+      <directionalLight
+        position={[4, 7, 5]}
+        intensity={4}
+        castShadow
+      />
 
-      {/* Cake Right Half */}
-      <group ref={rightHalfRef}>{renderCakeHalf("right")}</group>
+      <pointLight
+        position={[-4, 4, 4]}
+        intensity={8}
+        distance={12}
+      />
 
-      {/* Knife Animated Model */}
-      {showKnife && (
-        <group ref={knifeRef} position={[0, knifeY, 0]} rotation={[0, 0, -Math.PI / 6]}>
-          {/* Blade */}
-          <mesh position={[0, 0, 0]}>
-            <boxGeometry args={[0.04, 1.2, 0.25]} />
-            <meshStandardMaterial color="#E0E0E0" roughness={0.1} metalness={0.9} />
+      <Float
+        speed={1}
+        rotationIntensity={0.05}
+        floatIntensity={0.15}
+      >
+        <group>
+
+          {/* LEFT HALF */}
+          <group ref={leftRef}>
+            <mesh position={[-0.9, 0, 0]}>
+              <cylinderGeometry
+                args={[
+                  2.5,
+                  2.5,
+                  0.8,
+                  64,
+                  1,
+                  false,
+                  Math.PI,
+                  Math.PI,
+                ]}
+              />
+
+              <meshStandardMaterial
+                color="#f4b183"
+                roughness={0.55}
+              />
+            </mesh>
+
+            <mesh position={[-0.75, 0.65, 0]}>
+              <cylinderGeometry
+                args={[
+                  2.15,
+                  2.15,
+                  0.35,
+                  64,
+                  1,
+                  false,
+                  Math.PI,
+                  Math.PI,
+                ]}
+              />
+
+              <meshStandardMaterial
+                color="#fff4ec"
+                roughness={0.3}
+              />
+            </mesh>
+
+            <mesh position={[-0.7, 1.05, 0]}>
+              <cylinderGeometry
+                args={[
+                  1.75,
+                  1.75,
+                  0.65,
+                  64,
+                  1,
+                  false,
+                  Math.PI,
+                  Math.PI,
+                ]}
+              />
+
+              <meshStandardMaterial
+                color="#ffd7e5"
+                roughness={0.4}
+              />
+            </mesh>
+          </group>
+
+          {/* RIGHT HALF */}
+          <group ref={rightRef}>
+            <mesh position={[0.9, 0, 0]}>
+              <cylinderGeometry
+                args={[
+                  2.5,
+                  2.5,
+                  0.8,
+                  64,
+                  1,
+                  false,
+                  0,
+                  Math.PI,
+                ]}
+              />
+
+              <meshStandardMaterial
+                color="#f4b183"
+                roughness={0.55}
+              />
+            </mesh>
+
+            <mesh position={[0.75, 0.65, 0]}>
+              <cylinderGeometry
+                args={[
+                  2.15,
+                  2.15,
+                  0.35,
+                  64,
+                  1,
+                  false,
+                  0,
+                  Math.PI,
+                ]}
+              />
+
+              <meshStandardMaterial
+                color="#fff4ec"
+                roughness={0.3}
+              />
+            </mesh>
+
+            <mesh position={[0.7, 1.05, 0]}>
+              <cylinderGeometry
+                args={[
+                  1.75,
+                  1.75,
+                  0.65,
+                  64,
+                  1,
+                  false,
+                  0,
+                  Math.PI,
+                ]}
+              />
+
+              <meshStandardMaterial
+                color="#ffd7e5"
+                roughness={0.4}
+              />
+            </mesh>
+          </group>
+
+          {/* STRAWBERRIES */}
+          {[
+            [-1.1, 1.55, 0.2],
+            [0, 1.7, 0.25],
+            [1.1, 1.55, 0.2],
+          ].map((position, index) => (
+            <mesh
+              key={index}
+              position={position as [
+                number,
+                number,
+                number
+              ]}
+              scale={[0.25, 0.3, 0.25]}
+            >
+              <sphereGeometry args={[1, 24, 24]} />
+              <meshStandardMaterial
+                color="#e63855"
+                roughness={0.35}
+              />
+            </mesh>
+          ))}
+
+          {/* CANDLES */}
+          {[-1.05, -0.35, 0.35, 1.05].map(
+            (x, index) => (
+              <Candle
+                key={index}
+                id={index}
+                x={x}
+                extinguished={candlesOut.includes(index)}
+                onClick={() =>
+                  onCandleClick(index)
+                }
+              />
+            )
+          )}
+
+          {/* PLATE */}
+          <mesh position={[0, -0.5, 0]}>
+            <cylinderGeometry
+              args={[3.1, 3.1, 0.15, 64]}
+            />
+
+            <meshStandardMaterial
+              color="#ffffff"
+              roughness={0.25}
+            />
           </mesh>
-          {/* Handle */}
-          <mesh position={[0, 0.7, 0]}>
-            <cylinderGeometry args={[0.05, 0.05, 0.4, 16]} />
-            <meshStandardMaterial color="#5D4037" roughness={0.5} />
-          </mesh>
+
+          {/* KNIFE */}
+          {cut && (
+            <group
+              ref={knifeRef}
+              position={[0, 4, 0.8]}
+              rotation={[0, 0, 0]}
+            >
+              <mesh>
+                <boxGeometry
+                  args={[0.12, 3.2, 0.35]}
+                />
+
+                <meshStandardMaterial
+                  color="#dce5ef"
+                  metalness={0.9}
+                  roughness={0.18}
+                />
+              </mesh>
+
+              <mesh position={[0, 1.9, 0]}>
+                <boxGeometry
+                  args={[0.3, 0.9, 0.5]}
+                />
+
+                <meshStandardMaterial
+                  color="#4a2c20"
+                  roughness={0.45}
+                />
+              </mesh>
+            </group>
+          )}
         </group>
-      )}
-    </group>
+      </Float>
+
+      <OrbitControls
+        enableZoom={false}
+        enablePan={false}
+        enableRotate={false}
+      />
+    </>
+  );
+}
+
+export default function MagicCake(props: MagicCakeProps) {
+  return (
+    <Canvas
+      camera={{
+        position: [0, 1.5, 8],
+        fov: 45,
+      }}
+      shadows
+      dpr={[1, 1.5]}
+    >
+      <color attach="background" args={["#120b18"]} />
+
+      <CakeModel {...props} />
+    </Canvas>
   );
 }
